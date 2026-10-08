@@ -1,12 +1,18 @@
-import { createClient } from '@supabase/supabase-js';
+import { createClient, type SupabaseClient } from '@supabase/supabase-js'
+import type { Database } from './types'
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '';
+let supabase: SupabaseClient<Database> | undefined
 
-export const isSupabaseConfigured = Boolean(
-  supabaseUrl && supabaseAnonKey && !supabaseUrl.includes('<tu-')
-);
+export function getSupabase(): SupabaseClient<Database> {
+  if (supabase) return supabase
 
-export const supabase = isSupabaseConfigured
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+
+  if (!url || !anonKey) {
+    throw new Error('Faltan NEXT_PUBLIC_SUPABASE_URL o NEXT_PUBLIC_SUPABASE_ANON_KEY')
+  }
+
+  supabase = createClient<Database>(url, anonKey)
+  return supabase
+}

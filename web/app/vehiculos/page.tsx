@@ -4,26 +4,35 @@ import React, { useState, useEffect } from 'react';
 import { Vehiculo } from '@/lib/types';
 import { apiService } from '@/lib/api';
 import VehiculoCard from '@/components/vehiculos/VehiculoCard';
-import { 
-  Truck, 
-  CheckCircle2, 
-  Wrench, 
-  Layers, 
-  RefreshCw, 
+import {
+  Truck,
+  CheckCircle2,
+  Wrench,
+  Layers,
+  RefreshCw,
   Info,
-  ShieldCheck
+  ShieldCheck,
+  AlertCircle
 } from 'lucide-react';
 
 export default function VehiculosPage() {
   const [vehiculos, setVehiculos] = useState<Vehiculo[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'todos' | 'disponible' | 'mantenimiento'>('todos');
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   const loadVehiculos = async () => {
     setLoading(true);
-    const data = await apiService.getVehiculos();
-    setVehiculos(data);
-    setLoading(false);
+    try {
+      setVehiculos(await apiService.getVehiculos());
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'No se pudieron cargar los vehículos',
+      );
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
@@ -31,8 +40,12 @@ export default function VehiculosPage() {
   }, []);
 
   const handleToggleEstado = async (id: string) => {
-    const updated = await apiService.toggleVehiculoEstado(id);
-    setVehiculos(updated);
+    try {
+      setVehiculos(await apiService.toggleVehiculoEstado(id));
+      setErrorMessage(null);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : 'No se pudo actualizar el vehículo');
+    }
   };
 
   const disponibles = vehiculos.filter((v) => v.estado === 'disponible');
@@ -46,6 +59,13 @@ export default function VehiculosPage() {
 
   return (
     <div className="flex flex-col h-full gap-5">
+      {errorMessage && (
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+          <AlertCircle className="h-4 w-4 flex-shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
+
       {/* Encabezado y KPIs superiores */}
       <div className="flex flex-col gap-4 bg-white p-5 rounded-xl border border-slate-200 shadow-sm">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">

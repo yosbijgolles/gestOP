@@ -84,7 +84,14 @@ export default function RutasLayer({
 }: RutasLayerProps) {
   // Mapa de contenedores para buscar coordenadas de paradas de secuencia
   const containersMap = new Map<string, Contenedor>();
-  CONTENEDORES_MOCK.forEach((c) => containersMap.set(c.id, c));
+  for (const route of rutas) {
+    for (const stop of route.paradas ?? []) {
+      if (stop.contenedor) containersMap.set(stop.contenedor_id, stop.contenedor);
+    }
+  }
+  CONTENEDORES_MOCK.forEach((c) => {
+    if (!containersMap.has(c.id)) containersMap.set(c.id, c);
+  });
 
   return (
     <>
@@ -131,7 +138,7 @@ export default function RutasLayer({
               <Popup>
                 <div className="p-2 text-xs text-slate-800">
                   <div className="font-bold text-sm" style={{ color }}>
-                    Vehículo {ruta.vehiculo_id.toUpperCase()}
+                    Vehículo {ruta.vehiculo?.placa ?? ruta.vehiculo_id.toUpperCase()}
                   </div>
                   <div className="mt-1 space-y-0.5 text-slate-600">
                     <p>Distancia: <strong>{(ruta.distancia_m / 1000).toFixed(1)} km</strong></p>

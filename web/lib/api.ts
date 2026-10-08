@@ -1,155 +1,137 @@
-import { Contenedor, Vehiculo, EstadoVehiculo, Plan, OptimizeRequest } from './types';
-import { CONTENEDORES_MOCK, VEHICULOS_MOCK, PLAN_DEMO_MOCK } from './mockData';
+import type { Contenedor, EstadoVehiculo, OptimizeRequest, Plan, Vehiculo } from './types'
 
-const isBrowser = typeof window !== 'undefined';
-
-// Helper de persistencia local para prototipo fluido
-function getStoredVehicles(): Vehiculo[] {
-  if (!isBrowser) return VEHICULOS_MOCK;
-  const stored = localStorage.getItem('gestop_vehiculos');
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      // fallback
-    }
-  }
-  return VEHICULOS_MOCK;
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
-function saveStoredVehicles(vehicles: Vehiculo[]) {
-  if (isBrowser) {
-    localStorage.setItem('gestop_vehiculos', JSON.stringify(vehicles));
+async function readResponse(response: Response): Promise<unknown> {
+  let body: unknown
+  try {
+    body = await response.json()
+  } catch {
+    throw new Error(`La API devolvió una respuesta inválida (HTTP ${response.status})`)
   }
+
+  if (!response.ok) {
+    const message = isRecord(body) && typeof body.error === 'string' ? body.error : null
+    throw new Error(message ?? `La solicitud falló (HTTP ${response.status})`)
+  }
+
+  return body
 }
 
-function getStoredContainers(): Contenedor[] {
-  if (!isBrowser) return CONTENEDORES_MOCK;
-  const stored = localStorage.getItem('gestop_contenedores');
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      // fallback
-    }
-  }
-  return CONTENEDORES_MOCK;
+function isContenedor(value: unknown): value is Contenedor {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.codigo === 'string' &&
+    typeof value.direccion === 'string' &&
+    typeof value.zona === 'string' &&
+    typeof value.lat === 'number' &&
+    typeof value.lng === 'number' &&
+    typeof value.capacidad_litros === 'number' &&
+    typeof value.nivel_llenado === 'number' &&
+    typeof value.activo === 'boolean'
+  )
 }
 
-function saveStoredContainers(containers: Contenedor[]) {
-  if (isBrowser) {
-    localStorage.setItem('gestop_contenedores', JSON.stringify(containers));
+function isVehiculo(value: unknown): value is Vehiculo {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.placa === 'string' &&
+    typeof value.capacidad_m3 === 'number' &&
+    (value.estado === 'disponible' ||
+      value.estado === 'mantenimiento' ||
+      value.estado === 'fuera_servicio') &&
+    (typeof value.conductor === 'string' || value.conductor === null)
+  )
+}
+
+function isPlan(value: unknown): value is Plan {
+  return (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.fecha === 'string' &&
+    typeof value.estado === 'string' &&
+    typeof value.km_optimizado === 'number' &&
+    typeof value.km_baseline === 'number' &&
+    typeof value.ahorro_pct === 'number' &&
+    Array.isArray(value.rutas) &&
+    Array.isArray(value.no_asignados)
+  )
+}
+
+async function getContenedores(): Promise<Contenedor[]> {
+  const body = await readResponse(await fetch('/api/contenedores'))
+  if (!Array.isArray(body) || !body.every(isContenedor)) {
+    throw new Error('La API devolvió una lista de contenedores inválida')
   }
+  return body
+}
+
+async function getVehiculos(): Promise<Vehiculo[]> {
+  const body = await readResponse(await fetch('/api/vehiculos'))
+  if (!Array.isArray(body) || !body.every(isVehiculo)) {
+    throw new Error('La API devolvió una lista de vehículos inválida')
+  }
+  return body
 }
 
 export const apiService = {
-  // Contenedores
   async getContenedores(): Promise<Contenedor[]> {
-    try {
-      const res = await fetch('/api/contenedores');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
-      }
-    } catch (e) {
-      console.warn('API /api/contenedores no disponible, usando dataset local', e);
-    }
-    return getStoredContainers();
+    return getContenedores()
   },
 
   async toggleContenedorActivo(id: string): Promise<Contenedor[]> {
-    try {
-      const current = getStoredContainers();
-      const target = current.find(c => c.id === id);
-      if (target) {
-        await fetch(`/api/contenedores/${id}`, {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ activo: !target.activo }),
-        });
-      }
-    } catch (e) {
-      console.warn('Fallo PATCH /api/contenedores, aplicando localmente', e);
-    }
+    const contenedores = await getContenedores()
+    const target = contenedores.find((container) => container.id === id)
+    if (!target) throw new Error('No se encontró el contenedor')
 
-    const current = getStoredContainers();
-    const updated = current.map(c => (c.id === id ? { ...c, activo: !c.activo } : c));
-    saveStoredContainers(updated);
-    return updated;
+    const body = await readResponse(
+      await fetch(`/api/contenedores/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ activo: !target.activo }),
+      }),
+    )
+    if (!isContenedor(body)) throw new Error('La API devolvió un contenedor inválido')
+
+    return contenedores.map((container) => (container.id === id ? body : container))
   },
 
-  // Vehiculos
   async getVehiculos(): Promise<Vehiculo[]> {
-    try {
-      const res = await fetch('/api/vehiculos');
-      if (res.ok) {
-        const data = await res.json();
-        if (Array.isArray(data) && data.length > 0) return data;
-      }
-    } catch (e) {
-      console.warn('API /api/vehiculos no disponible, usando dataset local', e);
-    }
-    return getStoredVehicles();
+    return getVehiculos()
   },
 
   async toggleVehiculoEstado(id: string): Promise<Vehiculo[]> {
-    const current = getStoredVehicles();
-    const target = current.find(v => v.id === id);
-    if (!target) return current;
+    const vehiculos = await getVehiculos()
+    const target = vehiculos.find((vehicle) => vehicle.id === id)
+    if (!target) throw new Error('No se encontró el vehículo')
 
-    const nuevoEstado: EstadoVehiculo = target.estado === 'disponible' ? 'mantenimiento' : 'disponible';
-
-    try {
-      await fetch(`/api/vehiculos/${id}`, {
+    const nuevoEstado: EstadoVehiculo =
+      target.estado === 'disponible' ? 'mantenimiento' : 'disponible'
+    const body = await readResponse(
+      await fetch(`/api/vehiculos/${encodeURIComponent(id)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ estado: nuevoEstado }),
-      });
-    } catch (e) {
-      console.warn('Fallo PATCH /api/vehiculos, aplicando localmente', e);
-    }
+      }),
+    )
+    if (!isVehiculo(body)) throw new Error('La API devolvió un vehículo inválido')
 
-    const updated = current.map(v => (v.id === id ? { ...v, estado: nuevoEstado } : v));
-    saveStoredVehicles(updated);
-    return updated;
+    return vehiculos.map((vehicle) => (vehicle.id === id ? body : vehicle))
   },
 
-  // Planes de optimizacion
   async generarPlan(params: OptimizeRequest): Promise<Plan> {
-    try {
-      const res = await fetch('/api/planes', {
+    const body = await readResponse(
+      await fetch('/api/planes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(params),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data && data.rutas) return data;
-      }
-    } catch (e) {
-      console.warn('API /api/planes no disponible, generando plan simulado', e);
-    }
-
-    // Simulacion de llamada al optimizer con calculo dinamico segun vehiculos disponibles y umbral
-    await new Promise(r => setTimeout(r, 1200)); // Simula tiempo de calculo OR-Tools
-
-    const vehiculosDisponibles = getStoredVehicles().filter(v => v.estado === 'disponible');
-    const umbral = params.umbral_llenado ?? 60;
-    const contenedoresCandidatos = getStoredContainers().filter(c => c.activo && c.nivel_llenado >= umbral);
-
-    // Ajustar km_optimizado y baseline segun la carga
-    const n = contenedoresCandidatos.length;
-    const kmOptimizado = Number((42.5 + n * 0.85).toFixed(1));
-    const kmBaseline = Number((kmOptimizado * 1.45).toFixed(1));
-    const ahorroPct = Number((((kmBaseline - kmOptimizado) / kmBaseline) * 100).toFixed(1));
-
-    return {
-      ...PLAN_DEMO_MOCK,
-      id: `plan-${Date.now()}`,
-      fecha: params.fecha || new Date().toISOString().split('T')[0],
-      km_optimizado: kmOptimizado,
-      km_baseline: kmBaseline,
-      ahorro_pct: ahorroPct,
-    };
+      }),
+    )
+    if (!isPlan(body)) throw new Error('La API devolvió un plan inválido')
+    return body
   },
-};
+}

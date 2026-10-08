@@ -7,12 +7,12 @@ import { apiService } from '@/lib/api';
 import MetricasBanda from '@/components/ruteo/MetricasBanda';
 import RutasList from '@/components/ruteo/RutasList';
 import DiferidosList from '@/components/ruteo/DiferidosList';
-import { 
-  Route, 
-  Calendar, 
-  Sliders, 
-  Sparkles, 
-  RefreshCw, 
+import {
+  Route,
+  Calendar,
+  Sliders,
+  Sparkles,
+  RefreshCw,
   AlertCircle,
   Layers,
   MapPin
@@ -103,7 +103,7 @@ export default function RuteoPage() {
               <input
                 id="umbral-slider"
                 type="range"
-                min="40"
+                min="60"
                 max="90"
                 step="5"
                 value={umbralLlenado}
@@ -156,7 +156,10 @@ export default function RuteoPage() {
                 activeVehiculoId={activeVehiculoId}
                 onSelectVehiculo={setActiveVehiculoId}
               />
-              <DiferidosList noAsignadosIds={plan.no_asignados} />
+              <DiferidosList
+                noAsignadosIds={plan.no_asignados}
+                diferidos={plan.diferidos}
+              />
             </>
           ) : (
             <div className="bg-white p-6 rounded-xl border border-slate-200 text-center text-slate-400">

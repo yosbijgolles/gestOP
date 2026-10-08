@@ -2,15 +2,15 @@
 
 import React, { useState, useMemo } from 'react';
 import { Contenedor } from '@/lib/types';
-import { 
-  Search, 
-  Filter, 
-  AlertCircle, 
-  CheckCircle, 
-  Trash2, 
-  MapPin, 
+import {
+  Search,
+  Filter,
+  AlertCircle,
+  CheckCircle,
+  Trash2,
+  MapPin,
   Power,
-  SlidersHorizontal 
+  SlidersHorizontal
 } from 'lucide-react';
 
 interface TablaContenedoresProps {

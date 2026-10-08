@@ -7,19 +7,22 @@ import { AlertTriangle, Clock, MapPin } from 'lucide-react';
 
 interface DiferidosListProps {
   noAsignadosIds?: string[];
+  diferidos?: Contenedor[];
 }
 
-export default function DiferidosList({ noAsignadosIds = [] }: DiferidosListProps) {
-  if (!noAsignadosIds || noAsignadosIds.length === 0) {
+export default function DiferidosList({
+  noAsignadosIds = [],
+  diferidos,
+}: DiferidosListProps) {
+  if ((!diferidos || diferidos.length === 0) && noAsignadosIds.length === 0) {
     return null;
   }
 
   const map = new Map<string, Contenedor>();
   CONTENEDORES_MOCK.forEach((c) => map.set(c.id, c));
 
-  const contenedoresDiferidos = noAsignadosIds
-    .map((id) => map.get(id))
-    .filter(Boolean) as Contenedor[];
+  const contenedoresDiferidos =
+    diferidos ?? noAsignadosIds.map((id) => map.get(id)).filter((c): c is Contenedor => Boolean(c));
 
   return (
     <div className="bg-amber-50/70 border border-amber-200/90 rounded-xl p-3.5 space-y-2">

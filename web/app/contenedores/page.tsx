@@ -5,7 +5,7 @@ import dynamic from 'next/dynamic';
 import { Contenedor } from '@/lib/types';
 import { apiService } from '@/lib/api';
 import TablaContenedores from '@/components/contenedores/TablaContenedores';
-import { Trash2, AlertTriangle, CheckCircle2, RefreshCw } from 'lucide-react';
+import { Trash2, AlertTriangle, CheckCircle2, RefreshCw, AlertCircle } from 'lucide-react';
 
 // Dynamic import para evitar problemas de SSR con Leaflet
 const ContenedoresMap = dynamic(() => import('@/components/map/ContenedoresMap'), {
@@ -24,14 +24,22 @@ export default function ContenedoresPage() {
   const [contenedores, setContenedores] = useState<Contenedor[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedContenedor, setSelectedContenedor] = useState<Contenedor | null>(null);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
 
   // Carga inicial de datos
   useEffect(() => {
     async function loadData() {
       setLoading(true);
-      const data = await apiService.getContenedores();
-      setContenedores(data);
-      setLoading(false);
+      try {
+        setContenedores(await apiService.getContenedores());
+        setErrorMessage(null);
+      } catch (error) {
+        setErrorMessage(
+          error instanceof Error ? error.message : 'No se pudieron cargar los contenedores',
+        );
+      } finally {
+        setLoading(false);
+      }
     }
     loadData();
   }, []);
@@ -41,10 +49,17 @@ export default function ContenedoresPage() {
   };
 
   const handleToggleActivo = async (id: string) => {
-    const updated = await apiService.toggleContenedorActivo(id);
-    setContenedores(updated);
-    if (selectedContenedor && selectedContenedor.id === id) {
-      setSelectedContenedor(updated.find((c) => c.id === id) || null);
+    try {
+      const updated = await apiService.toggleContenedorActivo(id);
+      setContenedores(updated);
+      setErrorMessage(null);
+      if (selectedContenedor && selectedContenedor.id === id) {
+        setSelectedContenedor(updated.find((c) => c.id === id) || null);
+      }
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error ? error.message : 'No se pudo actualizar el contenedor',
+      );
     }
   };
 
@@ -77,6 +92,13 @@ export default function ContenedoresPage() {
           </div>
         </div>
       </div>
+
+      {errorMessage && (
+        <div role="alert" className="flex items-center gap-2 rounded-lg border border-rose-200 bg-rose-50 p-3 text-xs text-rose-800">
+          <AlertCircle className="h-4 w-4 shrink-0" />
+          <span>{errorMessage}</span>
+        </div>
+      )}
 
       {/* Contenido Principal: 2 Columnas (Tabla + Mapa) */}
       <div className="flex-1 grid grid-cols-1 lg:grid-cols-12 gap-4 min-h-0">

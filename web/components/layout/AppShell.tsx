@@ -3,13 +3,13 @@
 import React from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { 
-  Trash2, 
-  Truck, 
-  Route, 
-  Building2, 
-  CheckCircle2, 
-  Leaf, 
+import {
+  Trash2,
+  Truck,
+  Route,
+  Building2,
+  CheckCircle2,
+  Leaf,
   TrendingUp,
   MapPin
 } from 'lucide-react';

@@ -1,18 +1,21 @@
-import { NextResponse } from 'next/server';
-import { supabase, isSupabaseConfigured } from '@/lib/supabase';
-import { VEHICULOS_MOCK } from '@/lib/mockData';
+import { NextResponse } from 'next/server'
+import { errorResponse } from '@/lib/apiResponse'
+import { getSupabase } from '@/lib/supabase'
 
-export async function GET() {
+export async function GET(): Promise<NextResponse> {
   try {
-    if (isSupabaseConfigured && supabase) {
-      const { data, error } = await supabase.from('vehiculos').select('*').order('placa');
-      if (!error && data && data.length > 0) {
-        return NextResponse.json(data);
-      }
-    }
+    const { data, error } = await getSupabase()
+      .from('vehiculos')
+      .select('*')
+      .order('placa')
 
-    return NextResponse.json(VEHICULOS_MOCK);
-  } catch (err: any) {
-    return NextResponse.json({ error: err.message }, { status: 500 });
+    if (error) {
+      console.error('GET /api/vehiculos:', error.message)
+      return errorResponse('No se pudieron obtener los vehículos', 500)
+    }
+    return NextResponse.json(data)
+  } catch (error) {
+    console.error('GET /api/vehiculos:', error)
+    return errorResponse('No se pudieron obtener los vehículos', 500)
   }
 }
