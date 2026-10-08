@@ -1,0 +1,21 @@
+{
+  "deposito": { "lat": -5.1945, "lng": -80.6328 },
+  "botadero": { "lat": -5.1600, "lng": -80.5500 },
+  "vehiculos": [
+    { "id": "veh-01", "capacidad_m3": 12 },
+    { "id": "veh-02", "capacidad_m3": 12 },
+    { "id": "veh-03", "capacidad_m3": 8 }
+  ],
+  "contenedores": [
+    { "id": "cont-01", "lat": -5.1950, "lng": -80.6300, "volumen_m3": 1.1 },
+    { "id": "cont-02", "lat": -5.1960, "lng": -80.6290, "volumen_m3": 1.1 },
+    { "id": "cont-03", "lat": -5.1970, "lng": -80.6270, "volumen_m3": 1.1 },
+    { "id": "cont-04", "lat": -5.1980, "lng": -80.6250, "volumen_m3": 1.1 },
+    { "id": "cont-05", "lat": -5.1900, "lng": -80.6350, "volumen_m3": 1.1 },
+    { "id": "cont-06", "lat": -5.1880, "lng": -80.6360, "volumen_m3": 1.1 },
+    { "id": "cont-07", "lat": -5.1870, "lng": -80.6380, "volumen_m3": 1.1 },
+    { "id": "cont-08", "lat": -5.1920, "lng": -80.6400, "volumen_m3": 1.1 },
+    { "id": "cont-09", "lat": -5.2000, "lng": -80.6220, "volumen_m3": 1.1 },
+    { "id": "cont-10", "lat": -5.2020, "lng": -80.6200, "volumen_m3": 1.1 }
+  ]
+}
