@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { errorResponse, isFiniteNumber, isRecord } from '@/lib/api'
+import { errorResponse, isFiniteNumber, isRecord } from '@/lib/apiResponse'
 import { getSupabase } from '@/lib/supabase'
 import type { Contenedor } from '@/lib/types'
 

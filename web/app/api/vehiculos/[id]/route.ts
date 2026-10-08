@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { errorResponse, isRecord } from '@/lib/api'
+import { errorResponse, isRecord } from '@/lib/apiResponse'
 import { getSupabase } from '@/lib/supabase'
 import type { VehiculoEstado } from '@/lib/types'
 

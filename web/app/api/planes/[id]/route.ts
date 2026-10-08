@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { errorResponse } from '@/lib/api'
+import { errorResponse } from '@/lib/apiResponse'
 import { getSupabase } from '@/lib/supabase'
 import type { Parada, Vehiculo } from '@/lib/types'
 
@@ -90,17 +90,21 @@ export async function GET(_request: Request, { params }: RouteContext): Promise<
       return errorResponse('No se pudieron obtener los contenedores diferidos', 500)
     }
 
+    const diferidos = currentlyEligible.filter((container) => !assignedIds.has(container.id))
+
     return NextResponse.json({
       ...plan,
       rutas: routes.map((route) => ({
         ...route,
         vehiculo: vehicleById.get(route.vehiculo_id) ?? null,
+        secuencia: (stopsByRoute.get(route.id) ?? []).map((stop) => stop.contenedor_id),
         paradas: (stopsByRoute.get(route.id) ?? []).map((stop) => ({
           ...stop,
           contenedor: containerById.get(stop.contenedor_id) ?? null,
         })),
       })),
-      diferidos: currentlyEligible.filter((container) => !assignedIds.has(container.id)),
+      no_asignados: diferidos.map((container) => container.id),
+      diferidos,
     })
   } catch (error) {
     console.error('GET /api/planes/[id]:', error)

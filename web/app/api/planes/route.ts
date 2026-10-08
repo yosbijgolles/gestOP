@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { errorResponse, isFiniteNumber, isRecord } from '@/lib/api'
+import { errorResponse, isFiniteNumber, isRecord } from '@/lib/apiResponse'
 import { getSupabase } from '@/lib/supabase'
-import type { Contenedor, Json, Ruta, Vehiculo } from '@/lib/types'
+import type { Contenedor, GeoJSONLineString, Ruta, Vehiculo } from '@/lib/types'
 
 type OptimizerRoute = {
   vehiculo_id: string
   secuencia: string[]
   distancia_m: number
-  geometria: Json
+  geometria: GeoJSONLineString | null
 }
 
 type OptimizerResult = {
@@ -22,28 +22,36 @@ function isOptimizerRoute(value: unknown): value is OptimizerRoute {
     !isRecord(value) ||
     typeof value.vehiculo_id !== 'string' ||
     !Array.isArray(value.secuencia) ||
-    value.secuencia.length === 0 ||
     !value.secuencia.every((id) => typeof id === 'string') ||
     !isFiniteNumber(value.distancia_m) ||
     value.distancia_m < 0 ||
-    !isRecord(value.geometria) ||
-    value.geometria.type !== 'LineString' ||
-    !Array.isArray(value.geometria.coordinates) ||
-    value.geometria.coordinates.length < 2
+    !(value.geometria === null || isGeoJSONLineString(value.geometria))
   ) {
     return false
   }
-  return value.geometria.coordinates.every(
+  return true
+}
+
+function isGeoJSONLineString(value: unknown): value is GeoJSONLineString {
+  if (
+    !isRecord(value) ||
+    value.type !== 'LineString' ||
+    !Array.isArray(value.coordinates) ||
+    value.coordinates.length < 2
+  ) {
+    return false
+  }
+
+  return value.coordinates.every(
     (point) =>
       Array.isArray(point) &&
-      point.length >= 2 &&
+      point.length === 2 &&
       isFiniteNumber(point[0]) &&
       point[0] >= -180 &&
       point[0] <= 180 &&
       isFiniteNumber(point[1]) &&
       point[1] >= -90 &&
-      point[1] <= 90 &&
-      point.every((coordinate) => isFiniteNumber(coordinate)),
+      point[1] <= 90,
   )
 }
 
@@ -63,6 +71,27 @@ function isOptimizerResult(value: unknown): value is OptimizerResult {
 
 function volumeM3(container: Contenedor): number {
   return (container.capacidad_litros * container.nivel_llenado) / 100_000
+}
+
+function routeGeometry(
+  route: OptimizerRoute,
+  containers: Map<string, Contenedor>,
+  depot: { lat: number; lng: number },
+  dump: { lat: number; lng: number },
+): GeoJSONLineString {
+  return (
+    route.geometria ?? {
+      type: 'LineString',
+      coordinates: [
+        [depot.lng, depot.lat],
+        ...route.secuencia.map((id) => {
+          const container = containers.get(id)!
+          return [container.lng, container.lat] as [number, number]
+        }),
+        [dump.lng, dump.lat],
+      ],
+    }
+  )
 }
 
 async function deletePlanData(
@@ -99,7 +128,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     return errorResponse('La fecha debe tener el formato YYYY-MM-DD', 400)
   }
 
-  const threshold = body.umbral === undefined ? 60 : body.umbral
+  const threshold = body.umbral_llenado ?? body.umbral ?? 60
   if (!isFiniteNumber(threshold) || threshold < 60 || threshold > 100) {
     return errorResponse('El umbral debe estar entre 60 y 100', 400)
   }
@@ -243,6 +272,8 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
 
     try {
       for (const [index, route] of optimizerBody.rutas.entries()) {
+        if (route.secuencia.length === 0) continue
+
         let cumulativeLoad = 0
         const stops = route.secuencia.map((containerId, stopIndex) => {
           const container = containerById.get(containerId)!
@@ -254,6 +285,12 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             contenedor: container,
           }
         })
+        const geometry = routeGeometry(route, containerById, depot, dump)
+        if (!route.geometria) {
+          console.warn(
+            `POST /api/planes: el optimizador no devolvió geometría para ${route.vehiculo_id}; usando segmentos rectos`,
+          )
+        }
 
         const { data: savedRoute, error: routeError } = await client
           .from('rutas')
@@ -264,7 +301,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
             distancia_m: route.distancia_m,
             duracion_s: null,
             carga_total: cumulativeLoad,
-            geometria: route.geometria,
+            geometria: geometry,
           })
           .select()
           .single()
@@ -289,6 +326,7 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
         savedRoutes.push({
           ...savedRoute,
           vehiculo: vehicleById.get(route.vehiculo_id)!,
+          secuencia: route.secuencia,
           paradas: (savedStops ?? []).map((stop) => ({
             ...stop,
             contenedor: containerById.get(stop.contenedor_id),
@@ -302,7 +340,15 @@ export async function POST(request: NextRequest): Promise<NextResponse> {
     }
 
     const diferidos = containers.filter((container) => deferredIds.has(container.id))
-    return NextResponse.json({ ...plan, rutas: savedRoutes, diferidos }, { status: 201 })
+    return NextResponse.json(
+      {
+        ...plan,
+        rutas: savedRoutes,
+        no_asignados: diferidos.map((container) => container.id),
+        diferidos,
+      },
+      { status: 201 },
+    )
   } catch (error) {
     console.error('POST /api/planes:', error)
     return errorResponse('No se pudo generar el plan', 500)
